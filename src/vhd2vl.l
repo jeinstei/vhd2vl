@@ -22,7 +22,6 @@
 
 %option noinput
 %option nounput
-%option caseless
 
 %{
 #include <stdio.h>
@@ -66,73 +65,84 @@ void getbasedstring(unsigned skip);
 "\x0d\n" |
 \n { lineno++;}
 
-"entity" { return ENTITY; }
-"function" { return FUNCTION; }
-"procedure" { return PROCEDURE; }
-"is" { return IS; }
-"port" { return PORT; }
-"generic" { return GENERIC; }
-"map" { return MAP; }
-"in" { return IN; }
-"out" { return OUT; }
-"inout" { return INOUT; }
-"time" |
-"natural" |
-"positive" |
-"integer" { return INTEGER; }
-"boolean" |
-"std_logic" |
-"std_ulogic" { return BIT; }
-"signed" |
-"unsigned" |
-"std_logic_vector" |
-"std_ulogic_vector" { return BITVECT; }
-"real" { return REAL; }
-"downto" { return DOWNTO; }
-"to" { return TO; }
-"type" {return TYPE; }
-"end" { return END; }
-"for" { return FOR; }
-"loop" { return LOOP; }
-"generate" { return GENERATE; }
-"architecture" { return ARCHITECTURE; }
-"component" { return COMPONENT; }
-"of" { return OF; }
-"array" {return ARRAY; }
-"signal" { return SIGNAL; }
-"begin" { return BEGN; }
-"not" { return NOT; }
-"when" { return WHEN; }
-"exit" { return EXIT; }
-"with" { return WITH; }
-"select" { return SELECT; }
-"others" { return OTHERS; }
-"range" { return RANGE; }
-"process" { return PROCESS; }
-"variable" { return VARIABLE; }
-"constant" { return CONSTANT; }
-"null" { return NULLV; }
-"open" { return OPEN; }
-"if" { return IF; }
-"then" { return THEN; }
-"elsif" { return ELSIF; }
-"else" { return ELSE; }
-"case" { return CASE; }
-"after" { return AFTER; }
-"and" { return AND; }
-"or" { return OR; }
-"xor" { return XOR; }
-"xnor" { return XNOR; }
-"mod" { return MOD; }
-"event" { return EVENT; }
-"rising_edge" { return POSEDGE;}
-"falling_edge" { return NEGEDGE;}
-"resize" { return CONVFUNC_2;}
-"to_unsigned" { return CONVFUNC_2;}
-"to_integer" |
-"conv_integer" { return CONVFUNC_1;}
-"left" { return LEFT;}
-"high" { return LEFT;}
+(?i:entity) { return ENTITY; }
+(?i:procedure) { return PROCEDURE; }
+(?i:function) { return FUNCTION; }
+(?i:return) { return RETURN; }
+(?i:is) { return IS; }
+(?i:port) { return PORT; }
+(?i:generic) { return GENERIC; }
+(?i:map) { return MAP; }
+(?i:in) { return IN; }
+(?i:out) { return OUT; }
+(?i:inout) { return INOUT; }
+(?i:time) |
+(?i:natural) |
+(?i:positive) |
+(?i:integer) { return INTEGER; }
+(?i:boolean) |
+(?i:std_logic) |
+(?i:std_ulogic) { return BIT; }
+(?i:signed) |
+(?i:unsigned) |
+(?i:std_logic_vector) |
+(?i:std_ulogic_vector) { return BITVECT; }
+(?i:real) { return REAL; }
+(?i:downto) { return DOWNTO; }
+(?i:to) { return TO; }
+(?i:type) {return TYPE; }
+(?i:subtype) {return SUBTYPE; }
+(?i:end) { return END; }
+(?i:for) { return FOR; }
+(?i:loop) { return LOOP; }
+(?i:generate) { return GENERATE; }
+(?i:architecture) { return ARCHITECTURE; }
+(?i:component) { return COMPONENT; }
+(?i:of) { return OF; }
+(?i:array) {return ARRAY; }
+(?i:signal) { return SIGNAL; }
+(?i:begin) { return BEGN; }
+(?i:not) { return NOT; }
+(?i:when) { return WHEN; }
+(?i:exit) { return EXIT; }
+(?i:with) { return WITH; }
+(?i:select) { return SELECT; }
+(?i:others) { return OTHERS; }
+(?i:range) { return RANGE; }
+(?i:process) { return PROCESS; }
+(?i:variable) { return VARIABLE; }
+(?i:constant) { return CONSTANT; }
+(?i:null) { return NULLV; }
+(?i:open) { return OPEN; }
+(?i:if) { return IF; }
+(?i:then) { return THEN; }
+(?i:elsif) { return ELSIF; }
+(?i:else) { return ELSE; }
+(?i:while) { return WHILE; }
+(?i:case) { return CASE; }
+(?i:after) { return AFTER; }
+(?i:and) { return AND; }
+(?i:or) { return OR; }
+(?i:xor) { return XOR; }
+(?i:xnor) { return XNOR; }
+(?i:mod) { return MOD; }
+(?i:event) { return EVENT; }
+(?i:rising_edge) { return POSEDGE;}
+(?i:falling_edge) { return NEGEDGE;}
+(?i:resize) { return CONVFUNC_2;}
+(?i:to_unsigned) { return CONVFUNC_2;}
+(?i:to_integer) |
+(?i:conv_integer) { return CONVFUNC_1;}
+(?i:left) { return LEFT;}
+(?i:high) { return LEFT;}
+(?i:assert) {return ASSERT;}
+(?i:report) {return REPORT;}
+(?i:severity) {return SEVERITY;}
+(?i:failure) {return FAILURE;}
+(?i:error) {return ERROR;}
+(?i:warning) {return WARNING;}
+(?i:note) {return NOTE;}
+
 
 \"[ \!#-~]*\" |
 \'[01xz]\' { getstring(1); return STRING;}
@@ -153,7 +163,7 @@ void getbasedstring(unsigned skip);
   return NATURAL;
 }
 
-[0-9]+[ ]?\*\*[ ]?[0-9]+ {
+[a-zA-Z0-9_$.]+[ ]?\*\*[ ]?[a-zA-Z0-9_$.]+ {
   getstring(0);
   return EXPONENT;
 }
