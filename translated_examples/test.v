@@ -1,7 +1,7 @@
-// Project: VHDL to Verilog RTL translation 
-// Revision: 1.0 
-// Date of last Revision: February 27 2001 
-// Designer: Vincenzo Liguori 
+// Project: VHDL to Verilog RTL translation
+// Revision: 1.0
+// Date of last Revision: February 27 2001
+// Designer: Vincenzo Liguori
 // vhd2vl test file
 // This VHDL file exercises vhd2vl
 // no timescale needed
@@ -25,7 +25,7 @@ input wire [7:0] load,
 input wire [6:0] pack,
 input wire [2:0] base,
 input wire [21:0] qtd,
-output wire [25:0] dout,
+output wire [23:0] dout,
 output reg [7:0] pixel_out,
 output wire pixel_valid,
 output reg [9:0] code,
@@ -153,7 +153,7 @@ reg [1:0] colour;
     .start(start),
     .param(param),
     .addr(addr),
-    .din(din),
+    .din(din[23:0]),
     .we(we),
     .memdin(memdin),
     // Outputs

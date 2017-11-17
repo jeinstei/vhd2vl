@@ -93,17 +93,17 @@ void fslprint(FILE *fp,slist *sl){
     assert(sl != sl->slst);
     fslprint(fp,sl->slst);
     switch(sl->type){
-    case 0 :
+    case tSLIST : case tOTHERS :
       assert(sl != sl->data.sl);
       fslprint(fp,sl->data.sl);
       break;
-    case 1 : case 4 :
+    case tTXT :
       fprintf(fp,"%s",sl->data.txt);
       break;
-    case 2 :
+    case tVAL :
       fprintf(fp,"%d",sl->data.val);
       break;
-    case 3 :
+    case tPTXT :
       fprintf(fp,"%s",*(sl->data.ptxt));
       break;
     }
@@ -124,15 +124,19 @@ slist *copysl(slist *sl){
       newsl->slst = copysl(sl->slst);
     }
     switch(sl->type){
-    case 0 :
+    case tSLIST : case tOTHERS :
       if (sl->data.sl != NULL) {
         assert(sl != sl->data.sl);
         newsl->data.sl = copysl(sl->data.sl);
       }
       break;
-    case 1 : case 4 :
+    case tTXT :
       newsl->data.txt = xmalloc(strlen(sl->data.txt) + 1);
       strcpy(newsl->data.txt, sl->data.txt);
+      break;
+    default :
+      /* We really ignore tPTXT here? */
+      /* fprintf(stderr, "WARNING (line %d): unexpected slist type in copysl()\n", lineno); */
       break;
     }
     return newsl;
@@ -146,7 +150,7 @@ slist *addtxt(slist *sl, const char *s){
   if(s == NULL)
     return sl;
   p = xmalloc(sizeof *p);
-  p->type = 1;
+  p->type = tTXT;
   p->slst = sl;
   p->data.txt = xmalloc(strlen(s) + 1);
   strcpy(p->data.txt, s);
@@ -154,16 +158,15 @@ slist *addtxt(slist *sl, const char *s){
   return p;
 }
 
-slist *addothers(slist *sl, char *s){
+slist *addothers(slist *sl, slist *sl2){
   slist *p;
 
-  if(s == NULL)
+  if(sl2 == NULL)
     return sl;
   p = xmalloc(sizeof *p);
-  p->type = 4;
+  p->type = tOTHERS;
   p->slst = sl;
-  p->data.txt = xmalloc(strlen(s) + 1);
-  strcpy(p->data.txt, s);
+  p->data.sl = sl2;
 
   return p;
 }
@@ -175,7 +178,7 @@ slist *addptxt(slist *sl, char **s){
     return sl;
 
   p = xmalloc(sizeof *p);
-  p->type = 3;
+  p->type = tPTXT;
   p->slst = sl;
   p->data.ptxt = s;
 
@@ -186,7 +189,7 @@ slist *addval(slist *sl, int val){
   slist *p;
 
   p = xmalloc(sizeof(slist));
-  p->type = 2;
+  p->type = tVAL;
   p->slst = sl;
   p->data.val = val;
 
@@ -197,7 +200,7 @@ slist *addsl(slist *sl, slist *sl2){
   slist *p;
   if(sl2 == NULL) return sl;
   p = xmalloc(sizeof(slist));
-  p->type = 0;
+  p->type = tSLIST;
   p->slst = sl;
   p->data.sl = sl2;
   return p;
@@ -421,19 +424,21 @@ void slTxtReplace(slist *sl, const char *match, const char *replace){
   if(sl){
     slTxtReplace(sl->slst, match, replace);
     switch(sl->type) {
-    case 0 :
+    case tSLIST :
       slTxtReplace(sl->data.sl, match, replace);
       break;
-    case 1 :
+    case tTXT :
       if (strcmp(sl->data.txt, match) == 0) {
         sl->data.txt = strdup(replace);
       }
       break;
-    case 3 :
+    case tPTXT :
       if (strcmp(*(sl->data.ptxt), match) == 0) {
         *(sl->data.ptxt) = strdup(replace);
       }
       break;
+    default :
+      fprintf(stderr, "WARNING (line %d): unexpected slist type in slTxtReplace()\n", lineno);
     }
   }
 }
@@ -495,11 +500,11 @@ void fixothers(slist *size_expr, slist *sl) {
   if(sl) {
     fixothers(size_expr, sl->slst);
     switch(sl->type) {
-    case 0 :
+    case tSLIST :
       fixothers(size_expr,sl->data.sl);
       break;
-    case 4 : {
-      /* found an (OTHERS => 'x') clause - change to type 0, and insert the
+    case tOTHERS : {
+      /* found an (OTHERS => 'x') clause - change to type tSLIST, and insert the
        * size_expr for the corresponding signal */
       slist *p;
       slist *size_copy = xmalloc(sizeof(slist));
@@ -509,16 +514,17 @@ void fixothers(slist *size_expr, slist *sl) {
         fslprint(stderr,size_expr);
         fprintf(stderr,"\n");
       }
-      p = addtxt(NULL, "1'b");
-      p = addtxt(p, sl->data.txt);
-      p = addwrap("{",p,"}");
+      p = addwrap("{",sl->data.sl,"}");
       p = addsl(size_copy, p);
       p = addwrap("{",p,"}");
-      sl->type=0;
+      sl->type=tSLIST;
       sl->slst=p;
       sl->data.sl=NULL;
       break;
-    } /* case 4 */
+    } /* case tOTHERS */
+    default :
+      /* fprintf(stderr, "WARNING (line %d): unexpected slist type in fixothers()\n", lineno); */
+      break; /* no action */
     } /* switch */
   }
 }
@@ -1241,12 +1247,12 @@ a_decl    : {$$=NULL;}
               p->next=type_list;
               type_list=p;
             }
-/*           1     2          3   4      5r1   6   7       8  9r2      10   11  12 13r3 14        15  16   17      18 19r4 */
+          /* 1     2         3    4      5r1  6           7    8      9   10r2 11      12  13  14r3 15 16        17    18  19      20r4 */
           | a_decl COMPONENT NAME opt_is rem  opt_generic PORT nolist '(' rem portlist ')' ';' rem END COMPONENT oname ';' yeslist rem {
               $$=addsl($1,$20); /* a_decl, rem4 */
               free($3); /* NAME */
               free($10); /* rem2 */
-              free($14);/* rem3 */
+              free($14); /* rem3 */
             }
           ;
 
@@ -1305,6 +1311,7 @@ a_body : rem {$$=addind($1);}
            sl=addtxt(sl,";\n");
            $$=addsl(sl,$9);
          }
+       /* 1  2    3      4   5   6   7     8        9      10     11  12   13 */
        | rem BEGN signal '<' '=' rem norem sigvalue yesrem a_body END NAME ';' {
          slist *sl;
            sl=addsl($1,indents[indent]);
@@ -1389,7 +1396,7 @@ a_body : rem {$$=addind($1);}
            $$=addsl(sl,$16);
          }
        | optname PROCESS '(' sign_list ')' p_decl opt_is BEGN doindent
-           rem IF edge THEN p_body END IF ';' END PROCESS oname ';' unindent a_body {
+           rem IF edge THEN p_body END IF ';' rem END PROCESS oname ';' unindent a_body {
            slist *sl;
              if (0) fprintf(stderr,"process style 2: if then end if\n");
              sl=add_always($1,$4,$6,1);
@@ -1400,14 +1407,14 @@ a_body : rem {$$=addind($1);}
              sl=addsl(sl,$14);
              sl=addsl(sl,indents[indent]);
              sl=addtxt(sl,"end\n\n");
-             $$=addsl(sl,$23);
+             $$=addsl(sl,$24);
          }
        /* 1      2        3  4          5  6       7      8     9 */
        | optname PROCESS '(' sign_list ')' p_decl opt_is BEGN doindent
          /* 10 11 12    13    14         15  16       17    18   19   20       21     22       23  24 25 */
            rem IF exprc THEN doindent p_body unindent ELSIF edge THEN doindent p_body unindent END IF ';'
-         /* 26      27    28 29       30   31    */
-           END PROCESS oname ';' unindent a_body {
+         /* 26  27      28    29 30       31   32    */
+           rem END PROCESS oname ';' unindent a_body {
            slist *sl;
              if (0) fprintf(stderr,"process style 3: if then elsif then end if\n");
              sl=add_always($1,$4,$6,1);
@@ -1427,7 +1434,7 @@ a_body : rem {$$=addind($1);}
              sl=addtxt(sl,"  end\n");
              sl=addsl(sl,indents[indent]);
              sl=addtxt(sl,"end\n\n");
-             $$=addsl(sl,$31);
+             $$=addsl(sl,$32);
          }
        /* 1      2        3  4          5  6       7      8     9 */
        | optname PROCESS '(' sign_list ')' p_decl opt_is BEGN doindent
@@ -2120,11 +2127,11 @@ expr : signal {
            e->sl=addvec_base(NULL,$1,$2);
            $$=e;
          }
-     | '(' OTHERS '=' '>' STRING ')' {
+     | '(' OTHERS '=' '>' expr ')' {
          expdata *e;
            e=xmalloc(sizeof(expdata));
            e->op='o'; /* others */
-           e->sl=addothers(NULL,$5);
+           e->sl=addothers(NULL,$5->sl);
            $$=e;
          }
      | expr '&' expr { /* Vector chaining */
@@ -2392,7 +2399,7 @@ static int quiet;
     for(j=0;j<(i<<1);j++)
       *s++=' ';
     *s=0;
-    sl->type=1;
+    sl->type=tTXT;
     sl->slst=NULL;
   }
 

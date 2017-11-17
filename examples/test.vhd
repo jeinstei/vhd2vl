@@ -1,7 +1,7 @@
--- Project: VHDL to Verilog RTL translation 
--- Revision: 1.0 
--- Date of last Revision: February 27 2001 
--- Designer: Vincenzo Liguori 
+-- Project: VHDL to Verilog RTL translation
+-- Revision: 1.0
+-- Date of last Revision: February 27 2001
+-- Designer: Vincenzo Liguori
 -- vhd2vl test file
 -- This VHDL file exercises vhd2vl
 
@@ -25,14 +25,14 @@ entity test is port(
   base : in std_logic_vector(2 downto 0);
   qtd : in std_logic_vector(21 downto 0);
   -- Outputs
-  dout : out std_logic_vector(25 downto 0);
+  dout : out std_logic_vector(23 downto 0);
   pixel_out : out std_logic_vector(7 downto 0);
   pixel_valid : out std_logic;
   code : out std_logic_vector(9 downto 0);
   code1 : out std_logic_vector(9 downto 0);
   complex : out std_logic_vector(23 downto 0);
   eno : out std_logic
-);  
+);
 end test;
 
 architecture rtl of test is
@@ -46,11 +46,11 @@ component dsp port(
   en, start : in std_logic;
   param : in std_logic_vector(7 downto 0);
   addr : in std_logic_vector(2 downto 0);
-  din : in std_logic_vector(25 downto 0);
+  din : in std_logic_vector(23 downto 0);
   we : in std_logic;
   memdin : out std_logic_vector(13 downto 0);
     -- Outputs
-  dout : out std_logic_vector(25 downto 0);
+  dout : out std_logic_vector(23 downto 0);
   memaddr : out std_logic_vector(5 downto 0);
   memdout : out std_logic_vector(13 downto 0)
 );
@@ -66,7 +66,7 @@ component mem port(
   -- Outputs
   dout : out std_logic_vector(13 downto 0)
 );
-end component;  
+end component;
 
   type state is (red, green, blue, yellow);
   signal status : state;
@@ -86,14 +86,14 @@ begin
 
   -- Synchronously process
   process(clk) begin
-    if clk'event and clk = '1' then 
+    if clk'event and clk = '1' then
       pixel_out <= pixel_in xor "11001100";
     end if;
   end process;
 
   -- Synchronous process
   process(clk) begin
-    if rising_edge(clk) then 
+    if rising_edge(clk) then
       case status is
         when red => colour <= "00";
         when green => colour <= "01";
@@ -107,9 +107,9 @@ begin
   process(clk,rstn) begin
     if rstn = '0' then
       status <= red;
-    elsif rising_edge(clk) then 
+    elsif rising_edge(clk) then
       case status is
-        when red => 
+        when red =>
           if pix_req = '1' then
             status <= green;
           end if;
@@ -119,7 +119,7 @@ begin
             status <= blue;
           elsif (b(5) & a(3 downto 2)) = "001" then
             status <= yellow;
-          end if;          
+          end if;
         when blue =>
           status <= yellow;
         when others =>
@@ -137,7 +137,7 @@ begin
                         (others => '0') when "011",
                         std_logic_vector(unsigned(a) + unsigned(b)) when others;
   code1(1 downto 0) <= a(6 downto 5) xor (a(4) & b(6));
-  
+
   -- Asynch process
   decode : process(we, addr, config1, bip) begin
     if we = '1' then
@@ -162,7 +162,7 @@ begin
     start => start,
     param => param,
     addr => addr,
-    din => din,
+    din => din(23 downto 0),
     we => we,
     memdin => memdin,
     -- Outputs
@@ -170,7 +170,7 @@ begin
     memaddr => memaddr,
     memdout => memdout
   );
-  
+
   dsp_mem : mem port map(
     -- Inputs
     clk => clk,
