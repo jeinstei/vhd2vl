@@ -22,6 +22,7 @@
 
 %option noinput
 %option nounput
+%option caseless
 
 %{
 #include <stdio.h>
@@ -66,6 +67,8 @@ void getbasedstring(unsigned skip);
 \n { lineno++;}
 
 "entity" { return ENTITY; }
+"function" { return FUNCTION; }
+"procedure" { return PROCEDURE; }
 "is" { return IS; }
 "port" { return PORT; }
 "generic" { return GENERIC; }
@@ -147,6 +150,11 @@ void getbasedstring(unsigned skip);
 [0-9]+ {
   sscanf(yytext, "%d", &yylval.n);
   return NATURAL;
+}
+
+[0-9]+[ ]?\*\*[ ]?[0-9]+ {
+  getstring(0);
+  return EXPONENT;
 }
 
 [0-9]+e[0-9]+ |

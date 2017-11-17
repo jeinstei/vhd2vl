@@ -695,6 +695,7 @@ slist *emit_io_list(slist *sl)
 }
 
 %token <txt> REM ENTITY IS PORT GENERIC IN OUT INOUT MAP
+%token <txt> FUNCTION PROCEDURE
 %token <txt> INTEGER BIT BITVECT DOWNTO TO TYPE END
 %token <txt> ARCHITECTURE COMPONENT OF ARRAY
 %token <txt> SIGNAL BEGN NOT WHEN WITH EXIT
@@ -704,7 +705,7 @@ slist *emit_io_list(slist *sl)
 %token <txt> AFTER AND OR XOR MOD
 %token <txt> LASTVALUE EVENT POSEDGE NEGEDGE
 %token <txt> STRING NAME RANGE NULLV OPEN
-%token <txt> CONVFUNC_1 CONVFUNC_2 BASED FLOAT LEFT
+%token <txt> CONVFUNC_1 CONVFUNC_2 BASED FLOAT EXPONENT LEFT
 %token <txt> SCIENTIFIC REAL
 %token <n> NATURAL
 
@@ -2070,6 +2071,12 @@ expr : signal {
            $$=e;
          }
      | FLOAT {
+         expdata *e=xmalloc(sizeof(expdata));
+           e->op='t'; /* Terminal symbol */
+           e->sl=addtxt(NULL,$1);
+           $$=e;
+         }
+     | EXPONENT {
          expdata *e=xmalloc(sizeof(expdata));
            e->op='t'; /* Terminal symbol */
            e->sl=addtxt(NULL,$1);
