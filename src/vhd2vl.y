@@ -853,8 +853,8 @@ norem : /*Empty*/ {skipRem = 1;}
 yesrem : /*Empty*/ {skipRem = 0;}
 
 /* A function is basically a process */
-/*          1        2    3    4   5    6       7   8    9     10  11  12    13    14     15     16   17     18  19       20   21 */
-function  : FUNCTION NAME rem '(' rem genlist ')' rem RETURN type IS p_decl BEGN doindent p_body RETURN NAME ';' unindent END opt_function NAME ';' {
+/*          1        2    3    4   5    6      7   8    9     10  11  12    13    14     15     16       17   18 */
+function  : FUNCTION NAME rem '(' rem genlist ')' rem RETURN type IS p_decl BEGN p_body END opt_function NAME ';' {
             slist *sl;
             sl=addtxt(NULL,"function ");
             sl=addpar(sl,$10); /* return range */
@@ -864,10 +864,7 @@ function  : FUNCTION NAME rem '(' rem genlist ')' rem RETURN type IS p_decl BEGN
             // XXX Indentation is slightly broken here as we want genlist and p_decl to be at the same level
             sl=addsl(sl,$12); /* p_decl */
             sl=addtxt(sl,"begin\n");
-            sl=addsl(sl,$15); /* p_body */
-            sl=addtxt(sl,$2); /* return variable is function name */
-            sl=addtxt(sl," = "); /* return variable is function name */
-            sl=addtxt(sl,"???????;"); /* return junk name to throw error*/
+            sl=addsl(sl,$14); /* f_body */
             sl=addtxt(sl,"\n");
             fprintf(stderr,"WARNING (line %d): Function %s needs return variable set.\n", lineno, $2);
             $$=addtxt(sl,"endfunction\n");
@@ -1944,6 +1941,15 @@ p_body : rem {$$=$1;}
          sl=addsl($1,$2);
          $$=addsl(sl,$3);
         }
+        // XXX How to get the function name passed down automatically?
+       | rem RETURN norem sigvalue yesrem p_body {
+           slist *sl;
+           sl=addtxt(NULL,"FUNCTIONNAME");
+           sl=addtxt(sl," = ");
+           sl=addsl(sl,$4);
+           sl=addtxt(sl,";");
+           $$=addsl(sl,$6);
+       }
        ;
 
 elsepart : {$$=NULL;}
