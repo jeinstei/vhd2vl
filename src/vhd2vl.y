@@ -688,6 +688,7 @@ slist *emit_io_list(slist *sl)
               sl=addtxt(sl,");\n\n");
               return sl;
 }
+
 %}
 
 %union {
@@ -701,6 +702,7 @@ slist *emit_io_list(slist *sl)
 }
 
 %token <txt> REM ENTITY IS PORT GENERIC IN OUT INOUT MAP
+%token <txt> PROCEDURE FUNCTION RETURN
 %token <txt> INTEGER BIT BITVECT DOWNTO TO TYPE END
 %token <txt> ARCHITECTURE COMPONENT OF ARRAY
 %token <txt> SIGNAL BEGN NOT WHEN WITH EXIT
@@ -717,7 +719,9 @@ slist *emit_io_list(slist *sl)
 
 %type <n> trad
 %type <sl> rem  remlist entity
-%type <sl> portlist genlist architecture
+%type <sl> function procedure
+%type <sl> portlist genlist architecture 
+%type <sl> procportlist funcportlist
 %type <sl> a_decl a_body p_decl oname
 %type <sl> map_list map_item mvalue sigvalue
 %type <sl> generic_map_list generic_map_item
@@ -734,6 +738,8 @@ slist *emit_io_list(slist *sl)
 %type <e> simple_expr
 %type <ss> signal
 %type <txt> opt_is opt_generic opt_entity opt_architecture opt_begin
+%type <txt> opt_function opt_procedure opt_component
+%type <txt> opt_procconsttype
 %type <txt> generate endgenerate
 %type <txt> sevlevel
 
@@ -797,6 +803,22 @@ trad  : rem entity rem architecture rem {
           slprint(sl);
           $$=0;
         }
+      | rem function rem {
+          slist *sl;
+          sl = addsl($1,$2);
+          sl = addsl(sl,$3);
+          sl=addtxt(sl,"\nendmodule");
+          slprint(sl);
+          $$=0;
+        }
+      | rem procedure rem {
+          slist *sl;
+          sl = addsl($1,$2);
+          sl = addsl(sl,$3);
+          sl=addtxt(sl,"\nendmodule");
+          slprint(sl);
+          $$=0;
+        }
       ;
 
 /* Comments */
@@ -819,6 +841,12 @@ opt_architecture   : /* Empty */ {$$=NULL;} | ARCHITECTURE ;
 
 opt_begin    : /* Empty */ {$$=NULL;} | BEGN;
 
+opt_function  : /* Empty */ {$$=NULL;} | FUNCTION ;
+
+opt_procedure  : /* Empty */ {$$=NULL;} | PROCEDURE ;
+
+opt_component :  /* Empty */ {$$=NULL;} | COMPONENT ;
+
 generate       : GENERATE opt_begin;
 
 endgenerate    : END GENERATE;
@@ -827,15 +855,48 @@ endgenerate    : END GENERATE;
 norem : /*Empty*/ {skipRem = 1;}
 yesrem : /*Empty*/ {skipRem = 0;}
 
-/* Beginning support for assertions. Currently parsed but not translated. */
-vhdassert : ASSERT exprc REPORT STRING SEVERITY sevlevel ';' {
+/* A function is basically a process */
+/*          1        2    3    4   5    6      7   8    9     10  11  12    13    14     15     16       17   18 */
+function  : FUNCTION NAME rem '(' rem funcportlist ')' rem RETURN type IS p_decl BEGN p_body END opt_function NAME ';' {
+            slist *sl;
+            sl=addtxt(NULL,"function ");
+            sl=addpar(sl,$10); /* return range */
+            sl=addtxt(sl,$2); /* name */
+            sl=addtxt(sl,";\n");
+            sl=addsl(sl,$6); /* funcportlist */
+            // XXX Indentation is slightly broken here as we want genlist and p_decl to be at the same level
+            sl=addsl(sl,$12); /* p_decl */
+            sl=addtxt(sl,"begin\n");
+            sl=addsl(sl,$14); /* f_body */
+            sl=addtxt(sl,"\n");
+            fprintf(stderr,"WARNING (line %d): Function %s needs return variable set.\n", lineno, $2);
+            $$=addtxt(sl,"endfunction\n\n");
+           }
+
+/* Beginning support for assertions. Currently unused. */
+vhdassert  : ASSERT exprc REPORT STRING SEVERITY sevlevel ';' {
               fprintf(stderr,"WARNING (line %d): Ignoring assertion.\n",lineno);
               $$=NULL;
             }
 
 sevlevel  : WARNING | ERROR | FAILURE | NOTE {
                $$=NULL;
-            }
+           }
+
+/* A procedure is basically a process */
+/*             1        2    3   4   5   6        7   8   9    10      11     12      13      14    15 */
+procedure  : PROCEDURE NAME rem '(' rem procportlist ')' IS p_decl BEGN doindent p_body unindent END opt_procedure NAME ';' {
+            slist *sl;
+            sl=addtxt(NULL,"task ");
+            sl=addtxt(sl,$2); /* name */
+            sl=addtxt(sl,";\n");
+            sl=addsl(sl,$6); /* portlist */
+            // XXX Indentation is slightly broken here as we want genlist and p_decl to be at the same level
+            sl=addsl(sl,$9); /* p_decl */
+            sl=addtxt(sl,"begin\n");
+            sl=addsl(sl,$12); /* p_body */
+            $$=addtxt(sl,"endtask\n");
+           }
 
 /* Entity */
 /*          1      2    3  4     5  6   7         8   9  10  11  12    13 */
@@ -1030,6 +1091,205 @@ portlist  : s_list ':' dir type rem {
               } else{
                 free($9);
                 free($4);
+              }
+            }
+          ;
+
+               /* 1     2  3     4   5  6    7 */
+funcportlist  : s_list ':' type ':' '=' expr rem {
+          if(dolist){
+            slist *sl;
+            sglist *p;
+            sl=addtxt(NULL,"input");
+            sl=addpar(sl,$3); /* type */
+            p=$1;
+            for(;;){
+              sl=addtxt(sl,p->name);
+              sl=addtxt(sl,"=");
+              sl=addsl(sl, $6->sl); /* expr */
+              sl=addtxt(sl,";\n");
+              p=p->next;
+              if(p==NULL) break;
+            }
+            $$=addsl(sl,$7); /* rem */
+          } else {
+            $$=NULL;
+          }
+         }
+          /* 1     2  3     4   5  6     7  8    9 */
+         | s_list ':' type ':' '=' expr ';' rem genlist {
+          if(dolist){
+            slist *sl;
+            sglist *p;
+            sl=addtxt(NULL,"input");
+            sl=addpar(sl,$3); /* type */
+            p=$1;
+            for(;;){
+              sl=addtxt(sl,p->name);
+              sl=addtxt(sl,"=");
+              sl=addsl(sl, $6->sl); /* expr */
+              sl=addtxt(sl,";\n");
+              p=p->next;
+              if(p==NULL) break;
+            }
+            $$=addsl(sl,$8); /* rem */
+            $$=addsl(sl,$9); /* genlist */
+          } else {
+            $$=NULL;
+          }
+         }
+          /* 1     2  3     4   5  6 */
+         | s_list ':' type ';' rem genlist {
+          if(dolist){
+            slist *sl;
+            sglist *p;
+            sl=addtxt(NULL,"input");
+            sl=addpar(sl,$3); /* type */
+            p=$1;
+            for(;;){
+              sl=addtxt(sl,p->name);
+              sl=addtxt(sl,";\n");
+              p=p->next;
+              if(p==NULL) break;
+            }
+            $$=addsl(sl,$5); /* rem */
+            $$=addsl(sl,$6); /* genlist */
+          } else {
+            $$=NULL;
+          }
+         }
+          /* 1     2  3    4   */
+         | s_list ':' type rem  {
+          if(dolist){
+            slist *sl;
+            sglist *p;
+            sl=addtxt(NULL,"input");
+            sl=addpar(sl,$3); /* type */
+            p=$1;
+            for(;;){
+              sl=addtxt(sl,p->name);
+              sl=addtxt(sl,";\n");
+              p=p->next;
+              if(p==NULL) break;
+            }
+            $$=addsl(sl,$4); /* rem */
+          } else {
+            $$=NULL;
+          }
+         }
+        ;
+
+opt_procconsttype : /* EMPTY */ {$$=NULL;}
+                  | VARIABLE ;
+                  | CONSTANT ;
+                  | SIGNAL ;
+
+                 /* 1              2      3   4   5   6 */
+procportlist  : opt_procconsttype s_list ':' dir type rem {
+              if(dolist){
+                slist *sl;
+                sglist *p;
+                sl=addtxt(NULL,inout_string($4));
+                if ($4 == 1 || $4 == 2) {
+                    sl=addtxt(sl," reg");
+                }
+                sl=addpar(sl,$5); /* type */
+                p=$2;
+                for(;;){
+                  sl=addtxt(sl,p->name);
+                  p=p->next;
+                  if(p) {
+                      sl=addtxt(sl,", ");
+                  } else {
+                      sl=addtxt(sl,";\n");
+                      break;
+                  }
+                }
+                $$=addsl(sl,$6); /* rem */
+              } else {
+                $$=NULL;
+              }
+            }
+          /* 1                2      3   4   5    6   7   8 */
+          | opt_procconsttype s_list ':' dir type ';' rem procportlist {
+              if(dolist){
+                slist *sl;
+                sglist *p;
+                sl=addtxt(NULL,inout_string($4));
+                if ($4 == 1 || $4 == 2) {
+                    sl=addtxt(sl," reg");
+                }
+                sl=addpar(sl,$5); /* type */
+                p=$2;
+                for(;;){
+                  sl=addtxt(sl,p->name);
+                  p=p->next;
+                  if(p) {
+                      sl=addtxt(sl,", ");
+                  } else {
+                      sl=addtxt(sl,";\n");
+                      break;
+                  }
+                }
+                sl=addsl(sl,$7); /* rem */
+                $$=addsl(sl,$8); /* procportlist */
+              } else {
+                $$=NULL;
+              }
+            }
+          /* 1                2      3   4  5    6   7    8   9 */
+          | opt_procconsttype s_list ':' dir type ':' '=' expr rem {
+              fprintf(stderr,"WARNING (line %d): port default initialization ignored.\n",lineno);
+              if(dolist){
+                slist *sl;
+                sglist *p;
+                sl=addtxt(NULL,inout_string($4));
+                if ($4 == 1 || $4 == 2) {
+                    sl=addtxt(sl," reg");
+                }
+                sl=addpar(sl,$5); /* type */
+                p=$2;
+                for(;;){
+                  sl=addtxt(sl,p->name);
+                  p=p->next;
+                  if(p) {
+                      sl=addtxt(sl,", ");
+                  } else {
+                      sl=addtxt(sl,";\n");
+                      break;
+                  }
+                }
+                $$=addsl(sl,$9); /* rem */
+              } else {
+                $$=NULL;
+              }
+            }
+          /* 1                2      3   4  5    6   7    8     9  10  11 */
+          | opt_procconsttype s_list ':' dir type ':' '=' expr ';' rem procportlist{
+              fprintf(stderr,"WARNING (line %d): port default initialization ignored.\n",lineno);
+              if(dolist){
+                slist *sl;
+                sglist *p;
+                sl=addtxt(NULL,inout_string($4));
+                if ($4 == 1 || $4 == 2) {
+                    sl=addtxt(sl," reg");
+                }
+                sl=addpar(sl,$5); /* type */
+                p=$2;
+                for(;;){
+                  sl=addtxt(sl,p->name);
+                  p=p->next;
+                  if(p) {
+                      sl=addtxt(sl,", ");
+                  } else {
+                      sl=addtxt(sl,";\n");
+                      break;
+                  }
+                }
+                sl=addsl(sl,$10); /* rem */
+                $$=addsl(sl,$11); /* procportlist */
+              } else {
+                $$=NULL;
               }
             }
           ;
@@ -1260,11 +1520,25 @@ a_decl    : {$$=NULL;}
               type_list=p;
             }
           /* 1     2         3    4      5r1  6           7    8      9   10r2 11      12  13  14r3 15 16        17    18  19      20r4 */
-          | a_decl COMPONENT NAME opt_is rem  opt_generic PORT nolist '(' rem portlist ')' ';' rem END COMPONENT oname ';' yeslist rem {
+          | a_decl COMPONENT NAME opt_is rem  opt_generic PORT nolist '(' rem portlist ')' ';' rem END opt_component oname ';' yeslist rem {
               $$=addsl($1,$20); /* a_decl, rem4 */
               free($3); /* NAME */
               free($10); /* rem2 */
               free($14); /* rem3 */
+            }
+          /*    1     2  */
+          | a_decl function rem {
+              slist *sl=NULL;
+              sl=addsl(sl,$1);
+              sl=addsl(sl, $2);
+              $$=addrem(sl,$3);
+            }
+            /*    1     2  */
+          | a_decl procedure rem {
+              slist *sl=NULL;
+              sl=addsl(sl,$1);
+              sl=addsl(sl, $2);
+              $$=addrem(sl,$3);
             }
           ;
 
@@ -1838,6 +2112,15 @@ p_body : rem {$$=$1;}
            }else
              $$=$4;
          }
+        // XXX How to get the function name passed down automatically?
+       | rem RETURN norem sigvalue yesrem p_body {
+           slist *sl;
+           sl=addtxt(NULL,"FUNCTIONNAME");
+           sl=addtxt(sl," = ");
+           sl=addsl(sl,$4);
+           sl=addtxt(sl,";");
+           $$=addsl(sl,$6);
+       }
        ;
 
 elsepart : {$$=NULL;}

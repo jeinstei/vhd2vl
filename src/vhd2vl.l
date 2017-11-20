@@ -66,6 +66,9 @@ void getbasedstring(unsigned skip);
 \n { lineno++;}
 
 "entity" { return ENTITY; }
+"procedure" { return PROCEDURE; }
+"function" { return FUNCTION; }
+"return" { return RETURN; }
 "is" { return IS; }
 "port" { return PORT; }
 "generic" { return GENERIC; }
