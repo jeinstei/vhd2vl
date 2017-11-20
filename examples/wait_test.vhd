@@ -44,6 +44,7 @@ end process;
 time_wait : process
 begin
 wait for 50 ns;
+wait for 50 ms;
 end process;
 
 BIN_COMP : process
@@ -51,5 +52,14 @@ begin
   wait on A, B until clk = '1';
 end process BIN_COMP;
 
+compp : process
+begin
+  wait on A, B;
+  A <= '1';
+  B <= '0';
+  wait on A, B;
+  A <= '0';
+  B <= '1';
+end process compp;
 
 end architecture rtl;

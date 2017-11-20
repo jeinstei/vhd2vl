@@ -757,7 +757,7 @@ slist *emit_io_list(slist *sl)
 
 /* rule for "...ELSE IF edge THEN..." causes 1 shift/reduce conflict */
 /* rule for opt_begin causes 1 shift/reduce conflict */
-%expect 4
+%expect 2
 
 /* glr-parser is needed because processes can start with if statements, but
  * not have edges in them - more than one level of look-ahead is needed in that case
@@ -1480,7 +1480,7 @@ a_body : rem {$$=addind($1);}
          slist *sl;
            if (0) fprintf(stderr,"process style 5: no sensitivities\n");
            sl=addsl(NULL,indents[indent]);
-           sl=addtxt(sl,"always begin");
+           sl=addtxt(sl,"always begin\n");
            sl=addsl(sl,indents[indent]);
            sl=addsl(sl,$3);
            sl=addsl(sl,$7);
@@ -1855,21 +1855,24 @@ p_body : rem {$$=$1;}
         | rem WAIT ';' p_body {
             slist *sl;
             fprintf(stderr,"WARNING (line %d): Can't translate 'wait;' expressions.\n",lineno);
-            sl=addtxt(NULL,"WAIT STATEMENT // wait();");
+            sl=addsl($1,indents[indent]);
+            sl=addtxt(sl,"WAIT STATEMENT // wait();\n");
             $$=addsl(sl,$4);
         }
-        | rem WAIT UNTIL exprc p_body {
+        | rem WAIT UNTIL exprc ';' p_body {
             slist *sl;
-            sl=addtxt(NULL,"wait (");
+            sl=addsl($1,indents[indent]);
+            sl=addtxt(sl,"wait (");
             sl=addsl(sl,$4); /* exprc */
-            sl=addtxt(sl,");");
-            $$=addsl(sl,$5); /* p_body */
+            sl=addtxt(sl,");\n");
+            $$=addsl(sl,$6); /* p_body */
         }
-        | rem WAIT ON s_list p_body {
+        | rem WAIT ON s_list ';' p_body {
             slist *sl;
             sglist *p;
+            sl=addsl($1,indents[indent]);
             fprintf(stderr,"WARNING (line %d): 'wait on' expression will need editing.\n",lineno);
-            sl=addtxt(NULL,"@(");
+            sl=addtxt(sl,"@(");
             p=$4;
             for(;;) {
                 sl=addtxt(sl,p->name); /* s_list */
@@ -1880,16 +1883,21 @@ p_body : rem {$$=$1;}
                     break;
                 }
             }
-            sl=addtxt(sl,");");
-            $$=addsl(sl,$5); /* p_body */
+            sl=addtxt(sl,");\n");
+            $$=addsl(sl,$6); /* p_body */
         }
-        | rem WAIT FOR NATURAL NAME p_body {
+        | rem WAIT ON s_list UNTIL exprc ';' p_body {
+            fprintf(stderr,"WARNING (line %d): 'wait on nnn until yyy' expression ignored.\n",lineno);
+            $$=addsl(NULL,$8); /* p_body */
+        }
+        | rem WAIT FOR NATURAL NAME ';' p_body {
             slist *sl;
-            fprintf(stderr,"WARNING (line %d): Assuming unit time scale.\n",lineno);
-            sl=addtxt(NULL,"#");
+            set_timescale($5);
+            sl=addsl($1,indents[indent]);
+            sl=addtxt(sl,"#");
             sl=addval(sl,$4);
-            sl=addtxt(sl,";");
-            $$=addsl(sl,$6);
+            sl=addtxt(sl,";\n");
+            $$=addsl(sl,$7);
         }
        ;
 
