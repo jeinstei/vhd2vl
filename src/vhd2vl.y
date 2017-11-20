@@ -713,6 +713,7 @@ slist *emit_io_list(slist *sl)
 %token <txt> CONVFUNC_1 CONVFUNC_2 BASED FLOAT LEFT
 %token <txt> SCIENTIFIC REAL
 %token <txt> ASSERT REPORT SEVERITY WARNING ERROR FAILURE NOTE
+%token <txt> WAIT UNTIL ON
 %token <n> NATURAL
 
 %type <n> trad
@@ -756,7 +757,7 @@ slist *emit_io_list(slist *sl)
 
 /* rule for "...ELSE IF edge THEN..." causes 1 shift/reduce conflict */
 /* rule for opt_begin causes 1 shift/reduce conflict */
-%expect 2
+%expect 4
 
 /* glr-parser is needed because processes can start with if statements, but
  * not have edges in them - more than one level of look-ahead is needed in that case
@@ -1475,6 +1476,19 @@ a_body : rem {$$=addind($1);}
              sl=addtxt(sl,"end\n\n");
              $$=addsl(sl,$35); /* a_body */
          }
+       | optname PROCESS p_decl opt_is BEGN doindent p_body END PROCESS oname ';' unindent a_body {
+         slist *sl;
+           if (0) fprintf(stderr,"process style 5: no sensitivities\n");
+           sl=addsl(NULL,indents[indent]);
+           sl=addtxt(sl,"always begin");
+           sl=addsl(sl,indents[indent]);
+           sl=addsl(sl,$3);
+           sl=addsl(sl,$7);
+           sl=addsl(sl,indents[indent]);
+           sl=addtxt(sl,"end\n\n");
+           sl=addsl(sl,indents[indent]);
+           $$=addsl(sl,$13);
+         }
 
        /* note vhdl does not allow an else in an if generate statement */
        /* 1       2   3          4       5       6        7     8        9   10   11  12 */
@@ -1838,6 +1852,45 @@ p_body : rem {$$=$1;}
            }else
              $$=$4;
          }
+        | rem WAIT ';' p_body {
+            slist *sl;
+            fprintf(stderr,"WARNING (line %d): Can't translate 'wait;' expressions.\n",lineno);
+            sl=addtxt(NULL,"WAIT STATEMENT // wait();");
+            $$=addsl(sl,$4);
+        }
+        | rem WAIT UNTIL exprc p_body {
+            slist *sl;
+            sl=addtxt(NULL,"wait (");
+            sl=addsl(sl,$4); /* exprc */
+            sl=addtxt(sl,");");
+            $$=addsl(sl,$5); /* p_body */
+        }
+        | rem WAIT ON s_list p_body {
+            slist *sl;
+            sglist *p;
+            fprintf(stderr,"WARNING (line %d): 'wait on' expression will need editing.\n",lineno);
+            sl=addtxt(NULL,"@(");
+            p=$4;
+            for(;;) {
+                sl=addtxt(sl,p->name); /* s_list */
+                p=p->next;
+                if(p) {
+                    sl=addtxt(sl,", ");
+                } else {
+                    break;
+                }
+            }
+            sl=addtxt(sl,");");
+            $$=addsl(sl,$5); /* p_body */
+        }
+        | rem WAIT FOR NATURAL NAME p_body {
+            slist *sl;
+            fprintf(stderr,"WARNING (line %d): Assuming unit time scale.\n",lineno);
+            sl=addtxt(NULL,"#");
+            sl=addval(sl,$4);
+            sl=addtxt(sl,";");
+            $$=addsl(sl,$6);
+        }
        ;
 
 elsepart : {$$=NULL;}

@@ -137,6 +137,9 @@ void getbasedstring(unsigned skip);
 "error" {return ERROR;}
 "warning" {return WARNING;}
 "note" {return NOTE;}
+"wait" {return WAIT;}
+"until" {return UNTIL;}
+"on" {return ON;}
 
 \"[ \!#-~]*\" |
 \'[01xz]\' { getstring(1); return STRING;}
